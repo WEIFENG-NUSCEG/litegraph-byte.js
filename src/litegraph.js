@@ -101,6 +101,8 @@
         node_types_by_file_extension: {}, //used for dropping files in the canvas
         Nodes: {}, //node types by classname
 		Globals: {}, //used to store vars between graphs
+        EnumMapping: {}, //used to store enum id versus infos
+        ContextNodeLabelMapping: {}, //used to store node id versus labels
 
         searchbox_extras: {}, //used to add extra features to the search box
         auto_sort_node_types: false, // [true!] If set to true, will automatically sort node types / categories in the context menus
@@ -146,6 +148,37 @@
         // if true, all newly created nodes/links will use string UUIDs for their id fields instead of integers.
         // use this if you must have node IDs that are unique across all graphs and subgraphs.
         use_uuids: false,
+
+        /**
+         * @typedef {Object} EnumValueData
+         * @property {Number} id
+         * @property {String} enumName
+         * @property {String} enumKey
+         * @property {String} enumValue
+         */
+
+        /**
+         * Register all the enum information to the graph
+         * @method registerEnumMapping
+         * @param {Array<EnumValueData>} mappings information about all the enums
+         */
+        registerEnumMapping: function(mappings) {
+            if (mappings.length < 1) {
+                throw "Do not register empty enum info list";
+            }
+            mappings.forEach(value => {
+                LiteGraph.EnumMapping[value.id] = value
+            })
+        },
+
+        /**
+         * Register all the context node label to the graph
+         * @method registerContextNodeMapping
+         * @param {Record<number, string>} mappings information about all the node labels
+         */
+        registerContextNodeMapping: function(mappings) {
+            LiteGraph.ContextNodeLabelMapping = { ...mappings }
+        },
 
         /**
          * Register a node class so it can be listed when the user wants to create a new one

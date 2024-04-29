@@ -143,6 +143,13 @@ export type ContextMenuEventListener = (
     node: LGraphNode
 ) => boolean | void;
 
+export type EnumValueData = {
+    id: number;
+    enumName: string;
+    enumKey: string;
+    enumValue: string;
+};
+
 export const LiteGraph: {
     VERSION: number;
 
@@ -224,6 +231,10 @@ export const LiteGraph: {
     /** node types by class name */
     Nodes: Record<string, LGraphNodeConstructor>;
 
+    EnumMapping: Record<number, EnumValueData>;
+
+    ContextNodeLabelMapping: Record<number, string>;
+
     /** used to add extra features to the search box */
     searchbox_extras: Record<
         string,
@@ -235,6 +246,14 @@ export const LiteGraph: {
     >;
 
     createNode<T extends LGraphNode = LGraphNode>(type: string): T;
+    
+    /** Register the enum mapping to the context */
+    registerEnumMapping: (mappings: EnumValueData[]) => void;
+
+    /** Register the context node label mapping */
+    registerContextNodeMapping: (mappings: Record<number, string>) => void;
+
+
     /** Register a node class so it can be listed when the user wants to create a new one */
     registerNodeType(type: string, base: { new (): LGraphNode }): void;
     /** removes a node type from the system */
