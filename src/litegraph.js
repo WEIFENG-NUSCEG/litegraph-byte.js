@@ -57,6 +57,7 @@
         CARD_SHAPE: 4,
         ARROW_SHAPE: 5,
         GRID_SHAPE: 6, // intended for slot arrays
+        DIAMOND: 7,
 
         //enums
         INPUT: 1,
@@ -5378,7 +5379,8 @@ LGraphNode.prototype.executeAction = function(action)
             input_off: "#778",
             input_on: "#7F7", //"#BBD"
             output_off: "#778",
-            output_on: "#7F7" //"#BBD"
+            output_on: "#7F7", //"#BBD"
+            input_context: "#0096FF"
 		};
         this.default_connection_color_byType = {
             /*number: "#7F7",
@@ -8581,7 +8583,7 @@ LGraphNode.prototype.executeAction = function(action)
             glow = true;
         }
 
-        var low_quality = this.ds.scale < 0.6; //zoomed out
+        var low_quality = this.ds.scale < 0.3; //zoomed out
 
         //only render if it forces it to do it
         if (this.live_mode) {
@@ -8690,13 +8692,17 @@ LGraphNode.prototype.executeAction = function(action)
 
         //render inputs and outputs
         if (!node.flags.collapsed) {
-            //input connection slots
+            //input connection slots    
             if (node.inputs) {
+                var node_type = node.baseNodeData.operatorType;
+                var isSelector = node_type === "if_else_eq" || node_type === "switch"
+
                 for (var i = 0; i < node.inputs.length; i++) {
                     var slot = node.inputs[i];
                     
                     var slot_type = slot.type;
                     var slot_shape = slot.shape;
+                    var slot_link = slot.link;
                     
                     ctx.globalAlpha = editor_alpha;
                     //change opacity of incompatible slots when dragging a connection
@@ -8714,8 +8720,9 @@ LGraphNode.prototype.executeAction = function(action)
                               this.default_connection_color_byType[slot_type] ||
                               this.default_connection_color.input_off;
 
+                    ctx.fillStyle = !slot_link ? this.default_connection_color.input_context : ctx.fillStyle;
                     var pos = node.getConnectionPos(true, i, slot_pos);
-                    pos[0] -= node.pos[0];
+                    pos[0] -= isSelector && i !== 0 ? node.pos[0] : node.pos[0] + 10;
                     pos[1] -= node.pos[1];
                     if (max_y < pos[1] + LiteGraph.NODE_SLOT_HEIGHT * 0.5) {
                         max_y = pos[1] + LiteGraph.NODE_SLOT_HEIGHT * 0.5;
@@ -8725,6 +8732,10 @@ LGraphNode.prototype.executeAction = function(action)
 
 					if (slot_type == "array"){
                         slot_shape = LiteGraph.GRID_SHAPE; // place in addInput? addOutput instead?
+                    }
+
+                    if (!slot_link) {
+                        slot_shape = LiteGraph.DIAMOND;
                     }
                     
                     var doStroke = true;
@@ -8753,7 +8764,15 @@ LGraphNode.prototype.executeAction = function(action)
                         ctx.lineTo(pos[0] - 4, pos[1] + 6 + 0.5);
                         ctx.lineTo(pos[0] - 4, pos[1] - 6 + 0.5);
                         ctx.closePath();
-                    } else if (slot_shape === LiteGraph.GRID_SHAPE) {
+                    }
+                    else if (slot_shape === LiteGraph.DIAMOND) {
+                        ctx.moveTo(pos[0] + 5, pos[1]);
+                        ctx.lineTo(pos[0] + 0 , pos[1] - 5 );
+                        ctx.lineTo(pos[0] - 5, pos[1]);
+                        ctx.lineTo(pos[0] + 0, pos[1] + 5);
+                        ctx.closePath();
+                    }
+                    else if (slot_shape === LiteGraph.GRID_SHAPE) {
                         ctx.rect(pos[0] - 4, pos[1] - 4, 2, 2);
                         ctx.rect(pos[0] - 1, pos[1] - 4, 2, 2);
                         ctx.rect(pos[0] + 2, pos[1] - 4, 2, 2);
@@ -8768,7 +8787,7 @@ LGraphNode.prototype.executeAction = function(action)
 						if(low_quality)
 	                        ctx.rect(pos[0] - 4, pos[1] - 4, 8, 8 ); //faster
 						else
-	                        ctx.arc(pos[0], pos[1], 4, 0, Math.PI * 2);
+	                        ctx.arc(pos[0], pos[1], 5, 0, Math.PI * 2);
                     }
                     ctx.fill();
 
@@ -8804,7 +8823,7 @@ LGraphNode.prototype.executeAction = function(action)
                     }
                     
                     var pos = node.getConnectionPos(false, i, slot_pos);
-                    pos[0] -= node.pos[0];
+                    pos[0] -= node.pos[0] - 10;
                     pos[1] -= node.pos[1];
                     if (max_y < pos[1] + LiteGraph.NODE_SLOT_HEIGHT * 0.5) {
                         max_y = pos[1] + LiteGraph.NODE_SLOT_HEIGHT * 0.5;
@@ -8867,7 +8886,7 @@ LGraphNode.prototype.executeAction = function(action)
 						if(low_quality)
 	                        ctx.rect(pos[0] - 4, pos[1] - 4, 8, 8 );
 						else
-	                        ctx.arc(pos[0], pos[1], 4, 0, Math.PI * 2);
+	                        ctx.arc(pos[0], pos[1], 5, 0, Math.PI * 2);
                     }
 
                     //trigger
