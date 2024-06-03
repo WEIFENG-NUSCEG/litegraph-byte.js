@@ -57,6 +57,7 @@
         CARD_SHAPE: 4,
         ARROW_SHAPE: 5,
         GRID_SHAPE: 6, // intended for slot arrays
+        DIAMOND: 7,
 
         //enums
         INPUT: 1,
@@ -91,6 +92,23 @@
 
         proxy: null, //used to redirect calls
         node_images_path: "",
+
+        selector_input_name: {
+            switch_source:'switch_source',
+            compare_left:'compare_left',
+            compare_right:'compare_right',
+        },
+        
+        selector_node_type: {
+            switch:'switch',
+            if_else_eq:'if_else_eq',
+        },
+
+        selector_output_name: {
+            switch_outcome:'switch_outcome',
+            compare_outcome_true: 'compare_outcome_true',
+            compare_outcome_false: 'compare_outcome_false'
+        },
 
         debug: false,
         catch_exceptions: true,
@@ -2787,6 +2805,34 @@
     };
 
     /**
+     * get the node output type
+     * @method getType
+     */
+
+    LGraphNode.prototype.getOutputType = function() {
+        return this.baseNodeData.outputType ?? 'undefined';
+    };
+
+    /**
+     * get the node type
+     * @method getNodeOperatorType
+     */
+
+    LGraphNode.prototype.getNodeOperatorType = function() {
+        return this.baseNodeData?.operatorType ?? 'undefined';
+    };
+
+    /**
+     * check if node is selector 
+     * @method isSelector
+     */
+
+    LGraphNode.prototype.isSelector = function() {
+        return this.getNodeOperatorType() === LiteGraph.selector_node_type.switch || this.getNodeOperatorType() === LiteGraph.selector_node_type.if_else_eq;
+        
+    };
+
+    /**
      * sets the value of a property
      * @method setProperty
      * @param {String} name
@@ -3720,6 +3766,7 @@
         var title_width = compute_text_size(this.title);
         var input_width = 0;
         var output_width = 0;
+        var widget_width = 0;
 
         if (this.inputs) {
             for (var i = 0, l = this.inputs.length; i < l; ++i) {
@@ -3743,7 +3790,18 @@
             }
         }
 
-        size[0] = Math.max(input_width + output_width + 10, title_width);
+        if (this.widgets) {
+            for (var i = 0, l = this.widgets.length; i < l; ++i) {
+                var widget = this.widgets[i];
+                var text = widget.name + widget.text;
+                var text_width = compute_text_size(text) + 30;
+                if (widget_width < text_width) {
+                    widget_width = text_width;
+                }
+            }
+        }
+
+        size[0] = Math.max(input_width + output_width + 10, title_width, widget_width);
         size[0] = Math.max(size[0], LiteGraph.NODE_WIDTH);
         if (this.widgets && this.widgets.length) {
             size[0] = Math.max(size[0], LiteGraph.NODE_WIDTH * 1.5);
@@ -5378,7 +5436,8 @@ LGraphNode.prototype.executeAction = function(action)
             input_off: "#778",
             input_on: "#7F7", //"#BBD"
             output_off: "#778",
-            output_on: "#7F7" //"#BBD"
+            output_on: "#7F7", //"#BBD"
+            input_context: "#0096FF"
 		};
         this.default_connection_color_byType = {
             /*number: "#7F7",
@@ -5484,7 +5543,8 @@ LGraphNode.prototype.executeAction = function(action)
     LGraphCanvas.link_type_colors = {
         "-1": LiteGraph.EVENT_LINK_COLOR,
         number: "#AAA",
-        node: "#DCA"
+        node: "#DCA",
+        highlighted: '#AFB'
     };
     LGraphCanvas.gradients = {}; //cache of gradients
 
@@ -8581,7 +8641,7 @@ LGraphNode.prototype.executeAction = function(action)
             glow = true;
         }
 
-        var low_quality = this.ds.scale < 0.6; //zoomed out
+        var low_quality = this.ds.scale < 0.3; //zoomed out
 
         //only render if it forces it to do it
         if (this.live_mode) {
@@ -8690,13 +8750,14 @@ LGraphNode.prototype.executeAction = function(action)
 
         //render inputs and outputs
         if (!node.flags.collapsed) {
-            //input connection slots
+            //input connection slots    
             if (node.inputs) {
                 for (var i = 0; i < node.inputs.length; i++) {
                     var slot = node.inputs[i];
                     
                     var slot_type = slot.type;
                     var slot_shape = slot.shape;
+                    var slot_link = slot.link;
                     
                     ctx.globalAlpha = editor_alpha;
                     //change opacity of incompatible slots when dragging a connection
@@ -8714,6 +8775,7 @@ LGraphNode.prototype.executeAction = function(action)
                               this.default_connection_color_byType[slot_type] ||
                               this.default_connection_color.input_off;
 
+                    ctx.fillStyle = !slot_link ? this.default_connection_color.input_context : ctx.fillStyle;
                     var pos = node.getConnectionPos(true, i, slot_pos);
                     pos[0] -= node.pos[0];
                     pos[1] -= node.pos[1];
@@ -8725,6 +8787,10 @@ LGraphNode.prototype.executeAction = function(action)
 
 					if (slot_type == "array"){
                         slot_shape = LiteGraph.GRID_SHAPE; // place in addInput? addOutput instead?
+                    }
+
+                    if (!slot_link) {
+                        slot_shape = LiteGraph.DIAMOND;
                     }
                     
                     var doStroke = true;
@@ -8753,7 +8819,15 @@ LGraphNode.prototype.executeAction = function(action)
                         ctx.lineTo(pos[0] - 4, pos[1] + 6 + 0.5);
                         ctx.lineTo(pos[0] - 4, pos[1] - 6 + 0.5);
                         ctx.closePath();
-                    } else if (slot_shape === LiteGraph.GRID_SHAPE) {
+                    }
+                    else if (slot_shape === LiteGraph.DIAMOND) {
+                        ctx.moveTo(pos[0] + 5, pos[1]);
+                        ctx.lineTo(pos[0] + 0 , pos[1] - 5 );
+                        ctx.lineTo(pos[0] - 5, pos[1]);
+                        ctx.lineTo(pos[0] + 0, pos[1] + 5);
+                        ctx.closePath();
+                    }
+                    else if (slot_shape === LiteGraph.GRID_SHAPE) {
                         ctx.rect(pos[0] - 4, pos[1] - 4, 2, 2);
                         ctx.rect(pos[0] - 1, pos[1] - 4, 2, 2);
                         ctx.rect(pos[0] + 2, pos[1] - 4, 2, 2);
@@ -8768,7 +8842,7 @@ LGraphNode.prototype.executeAction = function(action)
 						if(low_quality)
 	                        ctx.rect(pos[0] - 4, pos[1] - 4, 8, 8 ); //faster
 						else
-	                        ctx.arc(pos[0], pos[1], 4, 0, Math.PI * 2);
+	                        ctx.arc(pos[0], pos[1], 5, 0, Math.PI * 2);
                     }
                     ctx.fill();
 
@@ -8867,7 +8941,7 @@ LGraphNode.prototype.executeAction = function(action)
 						if(low_quality)
 	                        ctx.rect(pos[0] - 4, pos[1] - 4, 8, 8 );
 						else
-	                        ctx.arc(pos[0], pos[1], 4, 0, Math.PI * 2);
+	                        ctx.arc(pos[0], pos[1], 5, 0, Math.PI * 2);
                     }
 
                     //trigger
@@ -9074,7 +9148,7 @@ LGraphNode.prototype.executeAction = function(action)
         ctx.fillStyle = bgcolor;
 
         var title_height = LiteGraph.NODE_TITLE_HEIGHT;
-        var low_quality = this.ds.scale < 0.5;
+        var low_quality = this.ds.scale < 0.3;
 
         //render node area depending on shape
         var shape =
@@ -9413,6 +9487,12 @@ LGraphNode.prototype.executeAction = function(action)
                 continue;
             }
 
+            var is_selector = node.isSelector();
+            var selector_output_slot;
+            if (is_selector) {
+                selector_output_slot = node.outputDepSlotNo;
+            }
+
             for (var i = 0; i < node.inputs.length; ++i) {
                 var input = node.inputs[i];
                 if (!input || input.link == null) {
@@ -9429,6 +9509,14 @@ LGraphNode.prototype.executeAction = function(action)
                 if (start_node == null) {
                     continue;
                 }
+
+                var is_matched_selector_output = selector_output_slot === i && i !== 0;
+                var is_computed = link.data !== undefined;
+                var is_selector_source = input.name === LiteGraph.selector_input_name.switch_source 
+                || input.name === LiteGraph.selector_input_name.compare_left
+                || input.name === LiteGraph.selector_input_name.compare_right
+                var is_hightlight_link = is_computed && (!is_selector || (is_selector && (is_matched_selector_output || is_selector_source)))
+
                 var start_node_slot = link.origin_slot;
                 var start_node_slotpos = null;
                 if (start_node_slot == -1) {
@@ -9483,7 +9571,7 @@ LGraphNode.prototype.executeAction = function(action)
                     link,
                     false,
                     0,
-                    null,
+                    is_hightlight_link ? LGraphCanvas.link_type_colors['highlighted']: is_computed ? 'rgba(255, 255, 255, 0.2)' : null,
                     start_dir,
                     end_dir
                 );
@@ -9534,7 +9622,7 @@ LGraphNode.prototype.executeAction = function(action)
         color,
         start_dir,
         end_dir,
-        num_sublines
+        num_sublines,
     ) {
         if (link) {
             this.visible_links.push(link);
@@ -9904,9 +9992,9 @@ LGraphNode.prototype.executeAction = function(action)
         }
         var width = node.size[0];
         var widgets = node.widgets;
-        posY += 2;
+        posY += 7;
         var H = LiteGraph.NODE_WIDGET_HEIGHT;
-        var show_text = this.ds.scale > 0.5;
+        var show_text = this.ds.scale > 0.3;
         ctx.save();
         ctx.globalAlpha = this.editor_alpha;
         var outline_color = LiteGraph.WIDGET_OUTLINE_COLOR;
@@ -10098,7 +10186,7 @@ LGraphNode.prototype.executeAction = function(action)
                         }
                         ctx.fillStyle = text_color;
                         ctx.textAlign = "right";
-                        ctx.fillText(String(w.value).substr(0,30), widget_width - margin * 2, y + H * 0.7); //30 chars max
+                        ctx.fillText(String(w.value), widget_width - margin * 2, y + H * 0.7); //30 chars max
 						ctx.restore();
                     }
                     break;
